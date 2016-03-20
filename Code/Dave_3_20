@@ -42,7 +42,6 @@ SEGTBL:
 .endmacro
 
 
-
 ;initial setup
 .ORG 0x000
 
