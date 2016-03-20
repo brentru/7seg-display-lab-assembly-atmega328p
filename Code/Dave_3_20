@@ -15,9 +15,9 @@ SEGTBL:
 ;I added the above, because it  says we have to convert the hex into two nibbles
 
 ; User-Defined Macros
-;.macro LDX ; loading XH and XL
-;	LDS @0, @2
-;	LDS @1, (@2+1)
+.macro LDX ; loading XH and XL
+	LDS @0, @2
+	LDS @1, (@2+1)
 .endmacro
 .macro RESETALL
 	;	resets all GPRs 
@@ -45,23 +45,24 @@ SEGTBL:
 
 ;initial setup
 .ORG 0x000
+
 ; macro'd initial setup
 RESETALL
 IOSETUP $02, $03
-;LDX XL,XH, NUM_2_DISPLAY ;Grab from NUM_2_DISPLAY and load into high and low of X
+LDX XL,XH, NUM_2_DISPLAY ;Grab from NUM_2_DISPLAY and load into high and low of X
 
-;LDI R21, ;
-;MOV R22, R21
-;SWAP R21
-;ANDI R21, 0x0F;sets R21 to the high nibble
-;ANDI R22, 0x0F; sets R22 to the low of the nibble
-LDI R22, 0x00 ; offset from 0, 0 in table
+LD R21, X+ ;
+MOV R22, R21
+SWAP R21
+ANDI R21, 0x0F;sets R21 to the high nibble
+ANDI R22, 0x0F; sets R22 to the low of the nibble
+LDI R23, 0x00 ; offset from 0, 0 in table
 
 LDI ZH, HIGH(SEGTBL<<1)
 LDI ZL, LOW(SEGTBL<<1)
 ADD ZL, R23
-EOR R22,R22
-ADC ZH,R22
+EOR R23,R23
+ADC ZH,R23
 LPM R24,Z
 NOP
 NOP
