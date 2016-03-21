@@ -50,12 +50,22 @@ RESETALL
 IOSETUP $02, $03
 LDX XL,XH, NUM_2_DISPLAY ;Grab from NUM_2_DISPLAY and load into high and low of X
 
-LD R21, X+ ;
-MOV R22, R21
-SWAP R21
-ANDI R21, 0x0F;sets R21 to the high nibble
-ANDI R22, 0x0F; sets R22 to the low of the nibble
-LDI R23, 0x00 ; offset from 0, 0 in table
+; splitting xh
+MOV R17, R27
+SWAP R17
+ANDI R17, 0x0f
+ANDI R27, 0x0f
+MOV R18,R27 
+NOP ; check values for now
+
+; splitting xl
+MOV R19, R26
+SWAP R19
+ANDI R19, 0x0f
+ANDI r26, 0x0f
+MOV R20, r26
+nop ; check values for now
+
 
 LDI ZH, HIGH(SEGTBL<<1)
 LDI ZL, LOW(SEGTBL<<1)
