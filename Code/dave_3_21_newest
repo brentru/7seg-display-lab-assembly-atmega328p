@@ -1,0 +1,123 @@
+; semi-working
+
+.nolist
+.include "m328pdef.inc"
+.list
+.dseg
+.org SRAM_START
+NUM_2_DISPLAY: .byte 2
+.cseg
+.org 0X0200
+SEGTBL: 
+.db 0x3f, 0x06, 0x53, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0xff, 0x77, 0x7e, 0x39, 0x53, 0x79, 0x71
+DIGLUT:
+.db 0b00111111,0b00000110,0b01010011,0b01001111,0b01100110,0b01101101,0b01111101,0b00000111,0b01111111,0b01100111,0b01110111,0b01111110,0b00111001,0b01011110, 0b01111001, 0b01110001
+;I added the above, because it  says we have to convert the hex into two nibbles
+
+; User-Defined Macros
+.macro LDX ; loading XH and XL
+	LDS @0, @2
+	LDS @1, (@2+1)
+.endmacro
+.macro RESETALL
+	;	resets all GPRs 
+	LDI R16, $00
+	LDI R17, $00
+	LDI R18, $00
+	LDI R19, $00
+	LDI R20, $00
+	LDI R21, $00
+	LDI R22, $00
+	LDI R23, $00
+	LDI R24, $00
+.endmacro
+
+.macro IOSETUP
+	;	initial IO setup
+	LDI R16, @0
+	LDI R17, @1
+	OUT DDRB, R16
+	OUT PORTB, R16
+	OUT PORTB, R17 ;Not sure if this actually happens.  We tried something similar before we left for break
+.endmacro
+
+.macro TURNOFF ; used during conversions
+	LDI R16, 0x00
+	OUT PORTB, R16
+.endmacro
+
+
+
+;initial setup
+.ORG 0x000
+
+; macro'd initial setup
+main:
+RESETALL
+IOSETUP $02, $03
+LDX XL,XH, NUM_2_DISPLAY ;Grab from NUM_2_DISPLAY and load into high and low of X
+rjmp splitxh
+
+; splitting xh
+splitxh:
+MOV R17, R27
+SWAP R17
+ANDI R17, 0x0f
+ANDI R27, 0x0f
+MOV R18,R27 
+rjmp splitxl
+
+; splitting xl
+splitxl:
+MOV R19, R26
+SWAP R19
+ANDI R19, 0x0f
+ANDI r26, 0x0f
+MOV R20, r26
+rjmp convn1
+
+; convert nib1
+convn1:
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R17
+LPM R21, Z
+NOP ; delay routine
+rjmp outputnibble1
+
+; convert nib2
+convn2:
+TURNOFF
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R18
+LPM R21, Z
+NOP ; delay routine
+;rjmp outputnibble2
+
+; convert nib3
+convn3:
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R19
+LPM R21, Z
+NOP ; delay routine
+;rjmp outputnibble3
+
+; convert nib4
+convn4:
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R20
+LPM R21, Z
+NOP ; delay routine
+;rjmp outputnibble4
+
+
+outputnibble1:
+OUT DDRD, R21
+OUT PORTD, R21
+rjmp convn2
+
+; delay routine
+delay4:
