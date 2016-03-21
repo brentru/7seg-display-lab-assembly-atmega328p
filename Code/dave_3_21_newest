@@ -120,4 +120,12 @@ OUT PORTD, R21
 rjmp convn2
 
 ; delay routine
-delay4:
+delay4ms:                                                        
+ldi     R18,byte3(12800)
+ldi     R17,high(12800)
+ldi     R16,low(12800)
+subi    R16,1
+sbci    R17,0
+sbci    R18,0
+brcc    pc-3
+ret
