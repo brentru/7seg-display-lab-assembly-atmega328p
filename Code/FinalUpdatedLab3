@@ -1,0 +1,213 @@
+; BRENT RUBELL, DAVE AUSTIN
+; GROUP #9
+; Lab #3
+; March 03/22
+
+.nolist
+.include "m328pdef.inc"
+.list
+
+; --variable selection, similar to lab #1-- ; 
+.dseg
+.org SRAM_START
+NUM_2_DISPLAY: .byte 2
+
+; ----lookup table storage---- ;
+.cseg
+.org 0X0200 ; lut storage address
+SEGTBL: ; worked-out hex table corresponding to 7-seg binary
+.db 0x3f, 0x06, 0x53, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0xff, 0xC7, 0x77, 0x7e, 0x39, 0x53, 0x79, 0x71
+DIGLUT:  ; 7-seg binary
+.db 0b00111111,0b00000110,0b01010011,0b01001111,0b01100110,0b01101101,0b01111101,0b00000111,0b01111111,0b01100111,0b01110111,0b01111110,0b00111001,0b01011110, 0b01111001, 0b01110001
+
+
+; ----User-Defined Macros---- ;
+
+.macro LDX ; loading XH and XL
+	LDS @0, @2
+	LDS @1, (@2+1)
+.endmacro
+
+.macro RESETALL
+	;	resets all GPRs 
+	LDI R16, $00
+	LDI R17, $00
+	LDI R18, $00
+	LDI R19, $00
+	LDI R20, $00
+	LDI R21, $00
+	LDI R22, $00
+	LDI R23, $00
+	LDI R24, $00
+.endmacro
+
+.macro IOSETUP
+	; IO setup
+	LDI R16, @0
+	OUT DDRB, R16
+	OUT PORTB, R16
+	
+.endmacro
+
+.macro TURNOFF 
+	; used during conversions to turn off cathodes/transistors
+	; For seg displays
+	; $01 shows first display on left
+	; $02 shows 2nd display from left
+	; $08 shows 3rd display
+	; $04 shows 4th display
+	LDI R16, 0x00
+	OUT PORTD, R16
+	OUT PORTB, R16
+.endmacro
+
+;--- END MACROS ---;
+
+;.ORG INT_VECTOR_SIZE+1
+.ORG 0x000
+jmp main
+
+.ORG INT_VECTORS_SIZE
+
+main:
+
+RESETALL ; macro call
+LDI R16,$5A 
+STS NUM_2_DISPLAY,R16 ; store value #1 into pointer
+LDI R16,0x6F
+STS NUM_2_DISPLAY+1,R16 ; store value #2 into pointer
+
+
+IOSETUP $01 ; setup IO to start segment one
+LDX XL,XH, NUM_2_DISPLAY ;Grab from NUM_2_DISPLAY and load into high and low of X
+rjmp splitxh 
+
+
+; ----Splitting Section---- ;
+; splitting xh
+splitxh:
+MOV R17, R27 ; store r27 in r17 to not modify r27
+SWAP R17 ; swap digits of r17
+ANDI R17, 0x0f ; mask low into r17
+ANDI R27, 0x0f ; mask high
+MOV R18,R27  ; move masked high bit into r18 
+rjmp splitxl
+
+; splitting xl, functions identically to splitxh
+splitxl:
+MOV R19, R26
+SWAP R19
+ANDI R19, 0x0f
+ANDI r26, 0x0f
+MOV R20, r26
+rjmp convn1 ; jump to start conversion routines
+
+; ----END Splitting Section---- ;
+
+
+; ----Nibble Conversion Section---- ;
+convn1:
+LDI ZH, HIGH(SEGTBL<<1) ; moves table over 1 and takes high of address 
+LDI ZL, LOW(SEGTBL<<1) ; moves table over 1 and takes low of address
+ADD ZL, R17 ; adds r17 nibble into Z low
+LPM R21, Z ; loads Z from program memory 
+rjmp outputnibble1 ; jump to output 
+; convert nib2, functions like convn1
+convn2:
+TURNOFF
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R18
+LPM R21, Z
+rjmp outputnibble2
+; convert nib3, functions like convn1
+convn3:
+TURNOFF
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R19
+LPM R21, Z
+rjmp outputnibble3
+; convert nib4, functions like convn1
+convn4: 
+TURNOFF
+LDI ZH, HIGH(SEGTBL<<1)
+LDI ZL, LOW(SEGTBL<<1)
+ADD ZL, R20
+LPM R21, Z
+rjmp outputnibble4
+; ----END conversion Section---- ;
+
+
+; ----Output Section---- ;
+outputnibble1:
+IOSETUP $01 ; set to output on LCD #1
+OUT DDRD, R21 ; set direction register D to R21
+OUT PORTD, R21 ; set port d to r21
+rjmp delay4msa ; delay 4ms a, problem with using ret fully explained in reflection
+outputnibble2:
+IOSETUP $02 ; set to output on LCD #2
+OUT DDRD, R21
+OUT PORTD, R21
+rjmp delay4msb
+outputnibble3:
+IOSETUP $08
+OUT DDRD, R21
+OUT PORTD, R21
+rjmp delay4msc
+outputnibble4:
+IOSETUP $04
+OUT DDRD, R21
+OUT PORTD, R21
+rjmp delay4msd
+; ----END Output Section---- ;
+
+
+; ----Delay Section---- ;
+;One cycle = 1/16000000, or 1.6 micro seconds
+;4ms = 64000 cycles
+;Inner loop takes 6 cycles, BRNE can give 2/1 cycles, to account for the 1, subtract 1 from cycles
+;64000-1 = 63999 / 6 = 10666
+;Doing the high and low of that value, creates the counters correctly, to effectively delay 4ms with the 6 cycle count of inner loop
+;Using ret was not working correctly, however jumping to the next conversion did
+;Four delay4ms that are identical exept which convn# is used, in order to delay in each nibble delay
+delay4msa:
+       ldi r22, low(10666) 
+       ldi r23, high(10666) 
+loop:  nop       
+       dec r22    
+       brne skip  
+       dec r23    
+skip:  brne loop  
+rjmp convn2
+
+delay4msb:
+       ldi r22, low(10666) 
+       ldi r23, high(10666) 
+loop2:  nop        
+       dec r22    
+       brne skip2  
+       dec r23    
+skip2:  brne loop2  
+rjmp convn3
+
+delay4msc:
+       ldi r22, low(10666) 
+       ldi r23, high(10666) 
+loop3:  nop        
+       dec r22   
+       brne skip3 
+       dec r23    
+skip3:  brne loop3  
+rjmp convn4
+
+delay4msd:
+       ldi r22, low(10666) 
+       ldi r23, high(10666) 
+loop4:  nop       
+       dec r22    
+       brne skip4  
+       dec r23    
+skip4:  brne loop4  
+ret
+; ----END Delay Section---- ;
